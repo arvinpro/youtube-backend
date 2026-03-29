@@ -3,6 +3,7 @@ import ApiError from "../utils/ErrorApi.js";
 import { User } from "../models/users.model.js";
 import { uploadOnCloudinary } from "../utils/cloudinary.js";
 import ApiResponse from "../utils/ApiResponse.js";
+import { Mongoose } from "mongoose";
 
 const GenerateAccessAndRefreshToken = async (userId) => {
   try {
@@ -307,12 +308,59 @@ const getUserChannelProfile = asyncHandler(async (req, res)=> {
   ])
 
   if(!channel?.length) throw new ApiError(401,"channel doesnot exist")
-
+    
   return res
   .status(200)
   .json(200,channel[0], "User channel feteched successfully")
+
 })
 
+const getWatchHistory = asyncHandler(async (req, res)=> {
+    const user = await User.aggregate([
+      {
+        $match: {
+          _id: new Mongoose.Types.ObjectId(req.user._id)
+        }
+      },
+      {
+        $lookup: {
+          from: "Video",
+          localField: "watchHistory",
+          foreignField: "_id",
+          as: "watchHistory",
+          pipeline: [
+            {
+              $lookup: {
+                from: "User",
+                localField: "owner",
+                foreignField: "_id",
+                as: "owner",
+                pipeline: [
+                  {
+                    $project: {
+                      fullname: 1,
+                      username: 1,
+                      avatar: 1
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              $addFields: {
+                owner: {
+                  $first: "owner"
+                }
+              }
+            }
+          ]
+        }
+      }
+    ])
+    return res.
+    status(200),
+    new ApiResponse(200, user[0].watchHistory,"watch history fetched")
+})
 
 export { 
   registerUser, 
@@ -323,5 +371,6 @@ export {
   updateAccountDetail,
   updateAvatar,
   updateCoverImage,
-  getUserChannelProfile
+  getUserChannelProfile,
+  getWatchHistory
 };
